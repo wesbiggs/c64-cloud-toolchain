@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: MIT
+# Every push and pull request: the action as a project's CI uses it, and
+# the fallback a cloud session takes when the release cannot be had.
+
+name: check
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The release's toolchain from the cache or the download (or, before
+  # setup.sh's RELEASE is published, built from source and cached).
+  action:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./
+        with:
+          packages: python3-pil
+
+      - name: Smoke test
+        run: test/run.sh
+
+      - name: The extra package is there
+        run: python3 -c 'import PIL'
+
+  # Ubuntu's cc65 and VICE, the ROMs from VICE's source and the Xvfb
+  # wrapper: what a cloud session gets when GitHub's release downloads
+  # are blocked.
+  ubuntu:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up with Ubuntu's packages
+        run: sudo C64TC_PREBUILT=0 ./setup.sh
+
+      - name: Smoke test
+        run: test/run.sh
+
+      - name: Run again, changing nothing
+        run: sudo C64TC_PREBUILT=0 ./setup.sh

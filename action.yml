@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: MIT
+name: C64 cloud toolchain
+description: >-
+  cc65 and a headless VICE (x64sc, c1541, petcat ...) on an Ubuntu 24.04
+  runner, on the PATH, cached between runs.
+author: Wes Biggs
+branding:
+  icon: cpu
+  color: blue
+
+inputs:
+  packages:
+    description: Extra apt packages the project wants too, separated by spaces (python3-pil, say).
+    required: false
+    default: ""
+  cache:
+    description: Keep the toolchain in the repository's Actions cache, keyed by this action's release.
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    # The cache restores as the runner's user, so the prefix must be its.
+    - name: Prepare the toolchain's directory
+      id: key
+      shell: bash
+      run: |
+        release=$(sed -n 's/^RELEASE=//p' "$GITHUB_ACTION_PATH/setup.sh")
+        echo "key=c64-cloud-toolchain-$release-$RUNNER_OS-$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
+        sudo mkdir -p /opt/c64-toolchain
+        sudo chown "$(id -u):$(id -g)" /opt/c64-toolchain
+
+    - name: Restore the toolchain
+      id: cache
+      if: inputs.cache == 'true'
+      uses: actions/cache/restore@v5
+      with:
+        path: /opt/c64-toolchain
+        key: ${{ steps.key.outputs.key }}
+
+    # The release's prebuilt toolchain, or built from source if that cannot
+    # be had, so CI never falls back to Ubuntu's older VICE.
+    - name: Set up cc65 and VICE
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.packages }}
+      run: |
+        # shellcheck disable=SC2086 # word-split on purpose: a list of packages
+        sudo env C64TC_FALLBACK=source "$GITHUB_ACTION_PATH/setup.sh" $PACKAGES
+        if [ -x /opt/c64-toolchain/vice/bin/x64sc ]; then
+          echo "C64TC_COMPLETE=1" >> "$GITHUB_ENV"
+        fi
+
+    # Saved straight away rather than at the job's end, so a failing test
+    # later in the job does not stop the next run from having it.
+    - name: Save the toolchain
+      if: inputs.cache == 'true' && steps.cache.outputs.cache-hit != 'true' && env.C64TC_COMPLETE == '1'
+      uses: actions/cache/save@v5
+      with:
+        path: /opt/c64-toolchain
+        key: ${{ steps.key.outputs.key }}
