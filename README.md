@@ -23,7 +23,7 @@ seconds instead of minutes.
 ```yaml
 steps:
   - uses: actions/checkout@v5
-  - uses: wesbiggs/c64-cloud-toolchain@v1.0.0
+  - uses: wesbiggs/c64-cloud-toolchain@v1.0.1
     with:
       packages: python3-pil   # optional: extra apt packages
   - run: make && make test
@@ -40,7 +40,7 @@ off.
 Run the script as root, from a pinned release:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/wesbiggs/c64-cloud-toolchain/v1.0.0/setup.sh \
+curl -fsSL https://raw.githubusercontent.com/wesbiggs/c64-cloud-toolchain/v1.0.1/setup.sh \
   | sudo sh -s -- python3-pil
 ```
 
@@ -92,7 +92,8 @@ pattern is also a simple way to write your own headless tests.
 
 The tag must be `RELEASE`, because that is how the script at a given tag
 knows which tarball is its own; the workflow refuses a release that is
-already out. Projects then move to the new tag when they are ready.
+already out. Releases are immutable, so a tag is used once: a release that
+went wrong is fixed by the next number, never by changing it. Projects then move to the new tag when they are ready.
 
 ## Licence
 

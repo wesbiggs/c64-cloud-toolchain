@@ -74,18 +74,18 @@ jobs:
           path: ${{ env.ASSET }}
 
       # With a pushed tag the release goes on it; run by hand, gh makes the
-      # tag on the commit this built.
+      # tag on the commit this built. Given the file, gh makes a draft,
+      # uploads it and only then publishes: releases here are immutable,
+      # so nothing can be added once one is out.
       - name: Publish
         if: env.PUBLISH == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE: ${{ steps.release.outputs.release }}
         run: |
-          gh release view "$RELEASE" >/dev/null 2>&1 \
-            || gh release create "$RELEASE" --target "$GITHUB_SHA" \
-                 --title "$RELEASE" \
-                 --notes "$(cat /opt/c64-toolchain/VERSION; echo; echo 'Built on ubuntu-24.04 into /opt/c64-toolchain.')"
-          gh release upload "$RELEASE" "$ASSET" --clobber
+          gh release create "$RELEASE" "$ASSET" --target "$GITHUB_SHA" \
+            --title "$RELEASE" \
+            --notes "$(cat /opt/c64-toolchain/VERSION; echo; echo 'Built on ubuntu-24.04 into /opt/c64-toolchain.')"
 
   # A fresh runner fetches what was just published, as a cloud session
   # would, and runs the smoke test with it.

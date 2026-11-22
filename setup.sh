@@ -38,7 +38,7 @@
 # the ROMs in $PREFIX/vice/share/vice.
 set -eu
 
-RELEASE=v1.0.0
+RELEASE=v1.0.1
 REPO=wesbiggs/c64-cloud-toolchain
 VICE_VERSION=3.10
 CC65_VERSION=2.19
