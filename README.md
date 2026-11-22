@@ -61,6 +61,16 @@ starts Xvfb when there is no display. Environment variables change this:
 | `C64TC_PREBUILT=0` | skip the download and go straight to the fallback |
 | `C64TC_FROM_SOURCE=1` | build from source, as the release does |
 
+## VICE 3.10's log crash, fixed here
+
+An unpatched VICE 3.10 crashes at startup (a segmentation fault, before the
+machine runs) whenever its output goes to a file or a pipe rather than a
+terminal or `/dev/null` -- which is where a CI log puts it. It logs that the
+CMD drives' ROMs are missing, and the code that strips the log's colours
+for a non-terminal reads a string it never made. The release's VICE is
+built with that line fixed. With another VICE 3.10, pass `+logcolorize`
+(no colours in the log) to avoid it.
+
 ## Checking it works
 
 `test/run.sh` builds `test/hello.c` with `cl65`, writes it to a disk image
@@ -86,5 +96,7 @@ are ready.
 ## Licence
 
 MIT (`LICENSE`). cc65 and VICE keep their own licences (zlib and GPL-2.0
-respectively), and the VICE in the release tarball is built unmodified from
-the source release named in `setup.sh`.
+respectively). The release tarball's cc65 is built unmodified from its
+`V2.19` tag, and its VICE from the 3.10 source release with the one-line
+fix described below; `setup.sh` (`patch_vice()`) is the whole of the
+change, and the sources are those releases.

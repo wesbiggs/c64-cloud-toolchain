@@ -105,6 +105,22 @@ build_cc65() {
     rm -rf "$src"
 }
 
+# VICE 3.10 crashes at startup when its log goes anywhere but a terminal or
+# /dev/null -- a file, a pipe, a CI log -- as soon as it logs anything (a
+# drive ROM it does not have, the CMD drives', always): log_helper() makes
+# the log's colourless copies only for a log file or with colours off, then
+# hands them to stdout when stdout is not a terminal, and strlen(NULL)
+# faults. Making them every time is the fix; +logcolorize avoids it in an
+# unpatched VICE. Refuses to build if the line is not there to patch.
+patch_vice() {
+    old='    if ((log_to_file) || (!log_colorize)) {'
+    grep -qxF "$old" src/log.c || {
+        say "src/log.c has changed: check the log patch in setup.sh"; exit 1; }
+    sed -i 's/^    if ((log_to_file) || (!log_colorize)) {$/    {   \/* c64-cloud-toolchain: always, for a stdout that is not a terminal *\//' \
+        src/log.c
+    grep -q 'c64-cloud-toolchain: always' src/log.c
+}
+
 build_vice() {
     say "building VICE $VICE_VERSION from source (a few minutes)"
     src=$(mktemp -d)
@@ -112,6 +128,7 @@ build_vice() {
     tar -xzf "$src/vice.tgz" -C "$src"
     (
         cd "$src/vice-$VICE_VERSION"
+        patch_vice
         ./configure --prefix="$PREFIX/vice" --enable-headlessui \
             --disable-html-docs --without-pulse --without-alsa \
             --without-png --without-libcurl >/dev/null
