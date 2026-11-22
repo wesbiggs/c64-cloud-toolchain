@@ -1,9 +1,11 @@
 # SPDX-License-Identifier: MIT
 # Build the toolchain from source, check it, and publish it as the release
-# asset setup.sh downloads. Runs when a tag v* is pushed; the tag must be
-# setup.sh's RELEASE, which is what makes the script at that tag fetch the
-# asset built from it. Run by hand, it builds and checks only, and keeps
-# the tarball as the run's artifact.
+# asset setup.sh downloads, under setup.sh's RELEASE: the script at that
+# tag fetches the asset built from it. Two ways to release: run this by
+# hand on main with "publish" ticked (it creates the tag on the commit it
+# built), or push the tag yourself (it must be RELEASE). Run by hand
+# without "publish", it builds and checks only, and keeps the tarball as
+# the run's artifact.
 
 name: release
 
@@ -11,6 +13,11 @@ on:
   push:
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish setup.sh's RELEASE from this commit (main only)
+        type: boolean
+        default: false
 
 concurrency:
   group: release-${{ github.ref }}
@@ -21,23 +28,36 @@ permissions:
 
 env:
   ASSET: c64-toolchain-ubuntu24.04-x86_64.tgz
+  PUBLISH: ${{ github.ref_type == 'tag' || (inputs.publish && github.ref == 'refs/heads/main') }}
 
 jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
+    outputs:
+      release: ${{ steps.release.outputs.release }}
 
     steps:
       - uses: actions/checkout@v5
 
-      - name: The tag is setup.sh's release
-        if: github.ref_type == 'tag'
+      - name: Which release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           release=$(sed -n 's/^RELEASE=//p' setup.sh)
-          [ "$release" = "$GITHUB_REF_NAME" ] || {
+          echo "release=$release" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$release" != "$GITHUB_REF_NAME" ]; then
             echo "::error::tag $GITHUB_REF_NAME, but setup.sh says RELEASE=$release"
             exit 1
-          }
+          fi
+          # Run by hand, a release that is already out is not made again:
+          # setup.sh's RELEASE wants moving on first.
+          if [ "$GITHUB_REF_TYPE" != tag ] && [ "$PUBLISH" = true ] \
+             && gh release view "$release" >/dev/null 2>&1; then
+            echo "::error::$release is already released: move RELEASE in setup.sh on"
+            exit 1
+          fi
 
       - name: Build cc65 and VICE from source
         run: sudo C64TC_FROM_SOURCE=1 ./setup.sh
@@ -53,27 +73,32 @@ jobs:
           name: toolchain
           path: ${{ env.ASSET }}
 
+      # With a pushed tag the release goes on it; run by hand, gh makes the
+      # tag on the commit this built.
       - name: Publish
-        if: github.ref_type == 'tag'
+        if: env.PUBLISH == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE: ${{ steps.release.outputs.release }}
         run: |
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
-            || gh release create "$GITHUB_REF_NAME" --verify-tag \
-                 --title "$GITHUB_REF_NAME" \
+          gh release view "$RELEASE" >/dev/null 2>&1 \
+            || gh release create "$RELEASE" --target "$GITHUB_SHA" \
+                 --title "$RELEASE" \
                  --notes "$(cat /opt/c64-toolchain/VERSION; echo; echo 'Built on ubuntu-24.04 into /opt/c64-toolchain.')"
-          gh release upload "$GITHUB_REF_NAME" "$ASSET" --clobber
+          gh release upload "$RELEASE" "$ASSET" --clobber
 
   # A fresh runner fetches what was just published, as a cloud session
   # would, and runs the smoke test with it.
   verify:
     needs: build
-    if: github.ref_type == 'tag'
+    if: github.ref_type == 'tag' || (inputs.publish && github.ref == 'refs/heads/main')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.build.outputs.release }}
 
       - name: Set up from the release
         run: sudo C64TC_FALLBACK=none ./setup.sh

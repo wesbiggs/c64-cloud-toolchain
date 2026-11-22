@@ -83,15 +83,16 @@ pattern is also a simple way to write your own headless tests.
 ## Making a release
 
 1. Set `RELEASE=` in `setup.sh` to the new tag (and the versions, if they
-   changed), and update the tag in this README.
-2. Commit, then tag that commit with the same name and push the tag.
-3. `.github/workflows/release.yml` builds from source, runs the smoke test,
-   publishes the tarball to the release, and checks a fresh runner can
-   download and use it.
+   changed), and update the tag in this README. Commit it to `main`.
+2. Run the **release** workflow on `main` with **publish** ticked (or push
+   a tag of that name yourself).
+3. It builds from source, runs the smoke test, creates the tag and the
+   release with the tarball, and checks that a fresh runner can download
+   and use it.
 
-The tag must match `RELEASE`, because that is how the script at a given tag
-knows which tarball is its own. Projects then move to the new tag when they
-are ready.
+The tag must be `RELEASE`, because that is how the script at a given tag
+knows which tarball is its own; the workflow refuses a release that is
+already out. Projects then move to the new tag when they are ready.
 
 ## Licence
 
